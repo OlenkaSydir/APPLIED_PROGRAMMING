@@ -11,7 +11,7 @@ def homepage():
 
 @app.route('/api/v1/hello-world-<int:var>')
 def hello_world(var):
-    return 'Hello World-' + str(var)
+    return 'Hello World ' + str(var)
 
 
 if __name__ == '__main__':
