@@ -3,7 +3,7 @@ from sqlalchemy import Column, orm
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
-engine = create_engine('postgresql://postgres:example@localhost:5432/note_maker')
+engine = create_engine('postgresql://ivanalchuk:default@localhost:5432/note_maker') #change it to postgres:example
 Base = declarative_base()
 SessionFactory = sessionmaker(bind=engine)
 Session = scoped_session(SessionFactory)
