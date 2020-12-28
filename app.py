@@ -2,7 +2,7 @@ from flask import Flask, request
 from models import Session, User, Note, ForeignEditor
 import utils
 import constants
-from constants import USER_PATH, BASE_PATH
+from constants import USER_PATH, BASE_PATH, NOTE_PATH
 from schemas import UserSchema
 from flask import jsonify
 
@@ -31,7 +31,6 @@ def create_user():
 
 @app.route(BASE_PATH + USER_PATH + '/' + '<int:user_id>', methods=['GET'])
 def get_user_by_id(user_id):
-    print(user_id)
     try:
         user = session.query(User).filter_by(id=int(user_id)).one()
 
@@ -84,6 +83,54 @@ def delete_user(user_id):
     session.commit()
 
     return constants.USER_DELETED, 200
+
+@app.route(BASE_PATH + NOTE_PATH, methods=['POST'])
+def create_note():
+
+    note_request = request.get_json()
+    tag_id = note_request['tag_id']
+    user_id = note_request['owner_id']
+    if(not utils.check_if_tag_exists(tag_id)):
+        return jsonify(constants.TAG_NOT_FOUND), 404
+
+    try:
+        user = session.query(User).filter_by(id=int(user_id)).one()
+
+    except:
+        return jsonify(constants.USER_NOT_FOUND), 404
+
+    note = Note(**note_request)
+
+    session.add(note)
+    session.commit()
+
+    return jsonify(constants.NOTE_CREATED), 201
+
+@app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['PUT'])
+def edit_note(note_id):
+
+    edit_dto = request.get_json()
+    editor_id = edit_dto["editor_id"]
+    print(editor_id)
+
+    try:
+        note = session.query(Note).filter_by(id=int(note_id)).one()
+    except:
+        return jsonify(constants.NOTE_NOT_FOUND), 404
+
+    print(note_id)
+
+    if not note.owner_id == int(editor_id):
+        if not utils.check_if_can_edit(note_id, editor_id):
+            return jsonify(constants.USER_CANNOT_EDIT), 400
+
+    edited_note = utils.process_edit(edit_dto, note)
+
+    if edited_note == None:
+        return jsonify(constants.SOMETHING_WENT_WRONG), 400
+
+    return jsonify(constants.NOTE_EDITED), 200
+
 
 
 if __name__ == '__main__':
