@@ -3,7 +3,7 @@ from models import Session, User, Note, ForeignEditor
 import utils
 import constants
 from constants import USER_PATH, BASE_PATH, NOTE_PATH
-from schemas import UserSchema
+from schemas import UserSchema, NoteSchema
 from flask import jsonify
 
 app = Flask("__name__")
@@ -130,6 +130,38 @@ def edit_note(note_id):
         return jsonify(constants.SOMETHING_WENT_WRONG), 400
 
     return jsonify(constants.NOTE_EDITED), 200
+
+@app.route(BASE_PATH + NOTE_PATH + '/' + 'users' + '<int:user_id>', methods=['GET'])
+def get_users_notes(user_id):
+    note_list = NoteSchema(many=True)
+    try:
+        notes = session.query(Note).filter_by(owner_id=int(user_id)).all()
+    except:
+        notes = []
+
+    return jsonify(note_list.dump(notes)), 200
+
+@app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['GET'])
+def get_note_by_id(note_id):
+    try:
+        note = session.query(Note).filter_by(id=int(note_id)).one()
+    except:
+        return jsonify(constants.NOTE_NOT_FOUND), 404
+
+    return jsonify(NoteSchema().dump(note)), 200
+
+@app.route(BASE_PATH+NOTE_PATH + '/' + '<int:note_id>', methods=['DELETE'])
+def delete_note(note_id):
+    try:
+        note = session.query(Note).filter_by(id=int(note_id)).one()
+    except:
+        return jsonify(constants.NOTE_NOT_FOUND), 400
+
+    session.delete(note)
+    session.commit()
+
+    return jsonify(constants.NOTE_DELETED), 200
+
 
 
 

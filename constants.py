@@ -16,6 +16,7 @@ NOTE_CREATED = 'Note successfully created'
 NOTE_NOT_FOUND = 'Note not found'
 USER_CANNOT_EDIT = 'User cannot edit this note'
 NOTE_EDITED = 'Note successfully edited'
+NOTE_DELETED = 'Note successfully deleted'
 
 #general messages
 SOMETHING_WENT_WRONG = 'Ooooops....Something went wrong'
