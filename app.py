@@ -2,8 +2,8 @@ from flask import Flask, request
 from models import Session, User, Note, ForeignEditor
 import utils
 import constants
-from constants import USER_PATH, BASE_PATH, NOTE_PATH
-from schemas import UserSchema, NoteSchema
+from constants import USER_PATH, BASE_PATH, NOTE_PATH, EDITOR_PATH
+from schemas import UserSchema, NoteSchema, ForeignEditorSchema
 from flask import jsonify
 
 app = Flask("__name__")
@@ -38,6 +38,17 @@ def get_user_by_id(user_id):
         return jsonify(constants.USER_NOT_FOUND), 404
 
     return jsonify(UserSchema().dump(user)), 200
+
+@app.route(BASE_PATH + USER_PATH, methods=['GET'])
+def get_all_users():
+    try:
+        users = session.query(User).all()
+    except:
+        users = []
+
+    users_dto = UserSchema(many=True)
+
+    return jsonify(users_dto.dump(users)), 200
 
 @app.route(BASE_PATH + USER_PATH + '/' + '<int:user_id>', methods=['PUT'])
 def update_user(user_id):
@@ -88,10 +99,10 @@ def delete_user(user_id):
 def create_note():
 
     note_request = request.get_json()
-    tag_id = note_request['tag_id']
+    tag_title = note_request['tag_title']
     user_id = note_request['owner_id']
-    if(not utils.check_if_tag_exists(tag_id)):
-        return jsonify(constants.TAG_NOT_FOUND), 404
+
+    tag = utils.create_or_assign_tag(tag_title)
 
     try:
         user = session.query(User).filter_by(id=int(user_id)).one()
@@ -99,30 +110,37 @@ def create_note():
     except:
         return jsonify(constants.USER_NOT_FOUND), 404
 
-    note = Note(**note_request)
+    note = Note(note_text=note_request['note_text'], owner_id=note_request['owner_id'], tag_id=tag.id)
 
     session.add(note)
     session.commit()
 
     return jsonify(constants.NOTE_CREATED), 201
 
+@app.route(BASE_PATH + NOTE_PATH, methods=['GET'])
+def get_all_notes():
+    try:
+        notes = session.query(Note).all()
+    except:
+        notes = []
+
+    notes_dto = NoteSchema(many=True)
+
+    return jsonify(notes_dto.dump(notes)), 200
+
 @app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['PUT'])
 def edit_note(note_id):
 
     edit_dto = request.get_json()
     editor_id = edit_dto["editor_id"]
-    print(editor_id)
 
     try:
         note = session.query(Note).filter_by(id=int(note_id)).one()
     except:
         return jsonify(constants.NOTE_NOT_FOUND), 404
 
-    print(note_id)
-
-    if not note.owner_id == int(editor_id):
-        if not utils.check_if_can_edit(note_id, editor_id):
-            return jsonify(constants.USER_CANNOT_EDIT), 400
+    if not utils.check_if_editor(note, editor_id):
+        return jsonify(constants.USER_CANNOT_EDIT), 400
 
     edited_note = utils.process_edit(edit_dto, note)
 
@@ -131,7 +149,7 @@ def edit_note(note_id):
 
     return jsonify(constants.NOTE_EDITED), 200
 
-@app.route(BASE_PATH + NOTE_PATH + '/' + 'users' + '<int:user_id>', methods=['GET'])
+@app.route(BASE_PATH + NOTE_PATH + '/' + 'users' + '/' + '<int:user_id>', methods=['GET'])
 def get_users_notes(user_id):
     note_list = NoteSchema(many=True)
     try:
@@ -157,11 +175,75 @@ def delete_note(note_id):
     except:
         return jsonify(constants.NOTE_NOT_FOUND), 400
 
+    try:
+        editors = session.query(ForeignEditor).filter_by(note_id=int(note_id)).all()
+    except:
+        editors = []
+
+    for editor in editors:
+        session.delete(editor)
+
     session.delete(note)
     session.commit()
 
     return jsonify(constants.NOTE_DELETED), 200
 
+@app.route(BASE_PATH + EDITOR_PATH, methods=['POST'])
+def assign_editor():
+    editor_dto = request.get_json()
+    try:
+        note = session.query(Note).filter_by(id=int(editor_dto['note_id'])).one()
+    except:
+        return jsonify(constants.NOTE_NOT_FOUND), 404
+
+    try:
+        editor = session.query(User).filter_by(id=int(editor_dto['editor_id'])).one()
+    except:
+        return jsonify(constants.EDITOR_NOT_FOUND_ASSIGN), 404
+
+    if utils.check_if_editor(note, editor_dto['editor_id']):
+        return jsonify(constants.ALREADY_EDITOR), 400
+
+
+    try:
+        foreign_editors = session.query(ForeignEditor).filter_by(note_id=int(editor_dto['note_id'])).all()
+    except:
+        foreign_editors = []
+
+    if len(foreign_editors) >= 5:
+        return jsonify(constants.EDITORS_OVERFLOW), 400
+
+    foreign_editor = ForeignEditor(**editor_dto)
+
+    session.add(foreign_editor)
+    session.commit()
+
+    return jsonify(constants.EDITOR_ASSIGNED), 201
+
+@app.route(BASE_PATH + EDITOR_PATH + '/' + '<int:foreign_editor_id>', methods=['DELETE'])
+def delete_editor(foreign_editor_id):
+
+    try:
+        foreign_editor = session.query(ForeignEditor).filter_by(id=foreign_editor_id).one()
+    except:
+        return jsonify(constants.EDITOR_NOT_FOUND), 404
+
+    session.delete(foreign_editor)
+    session.commit()
+
+    return jsonify(constants.EDITOR_DELETED), 200
+
+
+@app.route(BASE_PATH + EDITOR_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['GET'])
+def get_all_note_editors(note_id):
+    try:
+        editors = session.query(ForeignEditor).filter_by(note_id=int(note_id)).all()
+    except:
+        editors = []
+
+    editors_dto = ForeignEditorSchema(many=True)
+
+    return jsonify(editors_dto.dump(editors)), 200
 
 
 
