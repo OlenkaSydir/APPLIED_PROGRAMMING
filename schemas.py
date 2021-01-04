@@ -1,4 +1,4 @@
-from models import User, Note
+from models import User, Note, ForeignEditor
 from marshmallow import Schema, fields
 
 
@@ -11,3 +11,8 @@ class NoteSchema(Schema):
     class Meta:
         model = Note
         fields = ('id', 'note_text', 'owner_id', 'tag_id')
+
+class ForeignEditorSchema(Schema):
+    class Meta:
+        model = ForeignEditor
+        fields = ('id', 'editor_id')

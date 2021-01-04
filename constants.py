@@ -2,7 +2,7 @@
 BASE_PATH = '/api/v1/'
 USER_PATH = '/users'
 NOTE_PATH = '/notes'
-
+EDITOR_PATH = '/editors'
 
 #user messages
 USER_ALREADY_EXISTS  = 'User already exists, provide unique email'
@@ -21,5 +21,10 @@ NOTE_DELETED = 'Note successfully deleted'
 #general messages
 SOMETHING_WENT_WRONG = 'Ooooops....Something went wrong'
 
-#tag messages
-TAG_NOT_FOUND = 'TAG_NOT_FOUND'
+#editors_messages
+EDITOR_NOT_FOUND_ASSIGN = 'User not found, editor can not be assigned'
+ALREADY_EDITOR = 'User already can edit this note'
+EDITORS_OVERFLOW = 'Too much editors, max amount 5'
+EDITOR_NOT_FOUND = 'Editor not found'
+EDITOR_DELETED = 'Editor successfully deleted'
+EDITOR_ASSIGNED = 'Editor successfully assigned to this note'

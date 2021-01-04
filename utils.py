@@ -1,5 +1,6 @@
 from models import Session, User, Tag, ForeignEditor, Edit
 from datetime import datetime
+from slugify import slugify
 
 
 session = Session()
@@ -27,18 +28,27 @@ def update_util(user, data):
 
     return user
 
-def check_if_tag_exists(tag_id):
+def create_or_assign_tag(tag_title):
+
+    slugified_title = slugify(tag_title)
     try:
-        tag = session.query(Tag).filter_by(id=int(tag_id)).one()
+        tag = session.query(Tag).filter_by(title=slugified_title).one()
     except:
-        return False
+        tag = Tag(title=slugified_title)
+        session.add(tag)
+        session.commit()
 
-    return True
+    print(tag.id)
 
-def check_if_can_edit(note_id, editor_id):
+    return tag
+
+def check_if_editor(note, editor_id):
+
+    if editor_id == note.owner_id:
+        return True
 
     try:
-        foreign_editor = session.query(ForeignEditor).filter_by(note_id=int(note_id))\
+        foreign_editor = session.query(ForeignEditor).filter_by(note_id=note.id)\
             .filter_by(editor_id=int(editor_id))\
             .one()
     except:
@@ -61,5 +71,3 @@ def process_edit(edit_dto, note):
     session.commit()
 
     return note
-
-
