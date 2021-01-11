@@ -5,8 +5,10 @@ import constants
 from constants import USER_PATH, BASE_PATH, NOTE_PATH, EDITOR_PATH
 from schemas import UserSchema, NoteSchema, ForeignEditorSchema
 from flask import jsonify
+from flask_httpauth import HTTPBasicAuth
 
 app = Flask("__name__")
+auth = HTTPBasicAuth()
 
 session = Session()
 
@@ -29,10 +31,13 @@ def create_user():
 
     return jsonify(constants.USER_CREATED), 201
 
-@app.route(BASE_PATH + USER_PATH + '/' + '<int:user_id>', methods=['GET'])
-def get_user_by_id(user_id):
+
+@app.route(BASE_PATH + USER_PATH + "/" + "me", methods=['GET'])
+@auth.login_required
+def get_user_by_id():
+    user = auth.current_user()
     try:
-        user = session.query(User).filter_by(id=int(user_id)).one()
+        user = session.query(User).filter_by(id=user.id).one()
 
     except:
         return jsonify(constants.USER_NOT_FOUND), 404
@@ -50,13 +55,14 @@ def get_all_users():
 
     return jsonify(users_dto.dump(users)), 200
 
-@app.route(BASE_PATH + USER_PATH + '/' + '<int:user_id>', methods=['PUT'])
-def update_user(user_id):
-
+@app.route(BASE_PATH + USER_PATH + '/' + 'update_me', methods=['PUT'])
+@auth.login_required
+def update_user():
+    user = auth.current_user()
     update_request = request.get_json()
 
     try:
-        user = session.query(User).filter_by(id=int(user_id)).one()
+        user = session.query(User).filter_by(id=user.id).one()
     except:
         return jsonify(constants.USER_NOT_FOUND), 404
 
@@ -67,16 +73,18 @@ def update_user(user_id):
 
     return jsonify(constants.USER_UPDATED), 200
 
-@app.route(BASE_PATH + USER_PATH + '/' + '<int:user_id>', methods=['DELETE'])
-def delete_user(user_id):
 
+@app.route(BASE_PATH + USER_PATH + '/' + 'delete_me', methods=['DELETE'])
+@auth.login_required
+def delete_user():
+    user = auth.current_user()
     try:
-        user = session.query(User).filter_by(id=int(user_id)).one()
+        user = session.query(User).filter_by(id=user.id).one()
     except:
         return jsonify(constants.USER_NOT_FOUND), 404
 
     try:
-        notes = session.query(Note).filter_by(owner_id=int(user_id)).all()
+        notes = session.query(Note).filter_by(owner_id=user.id).all()
         editors = []
         for note in notes:
             editors += session.query(ForeignEditor).filter_by(note_id=note.id).all()
@@ -95,17 +103,31 @@ def delete_user(user_id):
 
     return constants.USER_DELETED, 200
 
-@app.route(BASE_PATH + NOTE_PATH, methods=['POST'])
-def create_note():
 
+@auth.verify_password
+def user_auth(username, password):
+
+    try:
+        user = session.query(User).filter_by(user_name=username).one()
+    except:
+        return None
+
+    if user.password == password:
+        return user
+
+
+@app.route(BASE_PATH + NOTE_PATH + "/add_my_note", methods=['POST'])
+@auth.login_required
+def create_note():
+    user = auth.current_user()
     note_request = request.get_json()
     tag_title = note_request['tag_title']
-    user_id = note_request['owner_id']
+    user.id = note_request['owner_id']
 
     tag = utils.create_or_assign_tag(tag_title)
 
     try:
-        user = session.query(User).filter_by(id=int(user_id)).one()
+        user = session.query(User).filter_by(id=user.id).one()
 
     except:
         return jsonify(constants.USER_NOT_FOUND), 404
@@ -129,47 +151,58 @@ def get_all_notes():
     return jsonify(notes_dto.dump(notes)), 200
 
 @app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['PUT'])
+@auth.login_required
 def edit_note(note_id):
-
+    user = auth.current_user()
     edit_dto = request.get_json()
-    editor_id = edit_dto["editor_id"]
 
     try:
         note = session.query(Note).filter_by(id=int(note_id)).one()
     except:
         return jsonify(constants.NOTE_NOT_FOUND), 404
 
-    if not utils.check_if_editor(note, editor_id):
+    if not utils.check_if_editor(note, user.id):
         return jsonify(constants.USER_CANNOT_EDIT), 400
 
-    edited_note = utils.process_edit(edit_dto, note)
+    edited_note = utils.process_edit(edit_dto, note, user.id)
 
     if edited_note == None:
         return jsonify(constants.SOMETHING_WENT_WRONG), 400
 
     return jsonify(constants.NOTE_EDITED), 200
 
-@app.route(BASE_PATH + NOTE_PATH + '/' + 'users' + '/' + '<int:user_id>', methods=['GET'])
-def get_users_notes(user_id):
+
+@app.route(BASE_PATH + NOTE_PATH + '/' + 'users' + '/' + 'my_notes', methods=['GET'])
+@auth.login_required
+def get_users_notes():
+    user = auth.current_user()
     note_list = NoteSchema(many=True)
     try:
-        notes = session.query(Note).filter_by(owner_id=int(user_id)).all()
+        notes = session.query(Note).filter_by(owner_id=user.id).all()
     except:
         notes = []
 
     return jsonify(note_list.dump(notes)), 200
 
+
 @app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['GET'])
+@auth.login_required
 def get_note_by_id(note_id):
+    user = auth.current_user()
     try:
         note = session.query(Note).filter_by(id=int(note_id)).one()
     except:
         return jsonify(constants.NOTE_NOT_FOUND), 404
+    if user.id == note.owner_id:
+        return jsonify(NoteSchema().dump(note)), 200
+    else:
+        return jsonify(constants.NOTE_UNACCESSABLE), 402
 
-    return jsonify(NoteSchema().dump(note)), 200
 
-@app.route(BASE_PATH+NOTE_PATH + '/' + '<int:note_id>', methods=['DELETE'])
+@app.route(BASE_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['DELETE'])
+@auth.login_required
 def delete_note(note_id):
+    user = auth.current_user()
     try:
         note = session.query(Note).filter_by(id=int(note_id)).one()
     except:
@@ -182,14 +215,18 @@ def delete_note(note_id):
 
     for editor in editors:
         session.delete(editor)
+    if user.id == note.owner_id:
+        session.delete(note)
+        session.commit()
+        return jsonify(constants.NOTE_DELETED), 200
+    else:
+        return jsonify(constants.NOTE_UNACCESSABLE), 402
 
-    session.delete(note)
-    session.commit()
 
-    return jsonify(constants.NOTE_DELETED), 200
-
-@app.route(BASE_PATH + EDITOR_PATH, methods=['POST'])
+@app.route(BASE_PATH + EDITOR_PATH + '/add_foreign_editor', methods=['POST'])
+@auth.login_required
 def assign_editor():
+    user = auth.current_user()
     editor_dto = request.get_json()
     try:
         note = session.query(Note).filter_by(id=int(editor_dto['note_id'])).one()
@@ -201,6 +238,8 @@ def assign_editor():
     except:
         return jsonify(constants.EDITOR_NOT_FOUND_ASSIGN), 404
 
+    if user.id != note.owner_id:
+        return jsonify(constants.NOTE_UNACCESSABLE), 402
     if utils.check_if_editor(note, editor_dto['editor_id']):
         return jsonify(constants.ALREADY_EDITOR), 400
 
@@ -220,31 +259,46 @@ def assign_editor():
 
     return jsonify(constants.EDITOR_ASSIGNED), 201
 
-@app.route(BASE_PATH + EDITOR_PATH + '/' + '<int:foreign_editor_id>', methods=['DELETE'])
-def delete_editor(foreign_editor_id):
+
+@app.route(BASE_PATH + EDITOR_PATH + '/' + '<int:foreign_editor_id>' + '/notes' + '/' + '<int:note_id>', methods=['DELETE'])
+@auth.login_required
+def delete_editor(foreign_editor_id, note_id):
+    user = auth.current_user()
+    try:
+        note = session.query(Note).filter_by(id=int(note_id)).one()
+    except:
+        return jsonify(constants.NOTE_NOT_FOUND), 404
 
     try:
         foreign_editor = session.query(ForeignEditor).filter_by(id=foreign_editor_id).one()
+
     except:
         return jsonify(constants.EDITOR_NOT_FOUND), 404
 
-    session.delete(foreign_editor)
-    session.commit()
+    if note.owner_id == user.id:
+        session.delete(foreign_editor)
+        session.commit()
+    else:
+        return jsonify(constants.NOTE_UNACCESSABLE), 402
 
     return jsonify(constants.EDITOR_DELETED), 200
 
 
-@app.route(BASE_PATH + EDITOR_PATH + NOTE_PATH + '/' + '<int:note_id>', methods=['GET'])
+@app.route(BASE_PATH + EDITOR_PATH + NOTE_PATH + '/all_notes' + '/' + '<int:note_id>', methods=['GET'])
+@auth.login_required
 def get_all_note_editors(note_id):
+    user = auth.current_user()
     try:
         editors = session.query(ForeignEditor).filter_by(note_id=int(note_id)).all()
     except:
         editors = []
 
     editors_dto = ForeignEditorSchema(many=True)
-
-    return jsonify(editors_dto.dump(editors)), 200
-
+    note = session.query(Note).filter_by(id=int(note_id)).one()
+    if user.id == note.owner_id:
+        return jsonify(editors_dto.dump(editors)), 200
+    else:
+        return jsonify(constants.NOTE_UNACCESSABLE), 402
 
 
 if __name__ == '__main__':

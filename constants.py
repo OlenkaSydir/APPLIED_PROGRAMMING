@@ -17,6 +17,7 @@ NOTE_NOT_FOUND = 'Note not found'
 USER_CANNOT_EDIT = 'User cannot edit this note'
 NOTE_EDITED = 'Note successfully edited'
 NOTE_DELETED = 'Note successfully deleted'
+NOTE_UNACCESSABLE = 'Note is not accessible'
 
 #general messages
 SOMETHING_WENT_WRONG = 'Ooooops....Something went wrong'

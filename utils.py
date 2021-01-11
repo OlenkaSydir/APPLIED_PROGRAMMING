@@ -14,7 +14,7 @@ def find_by_email(email):
     return user
 
 
-def update_util(user, data):
+def update_util(user, data): #?????????
     try:
         if data.get('user_name', None):
             user.user_name = data['user_name']
@@ -57,7 +57,7 @@ def check_if_editor(note, editor_id):
     return True
 
 
-def process_edit(edit_dto, note):
+def process_edit(edit_dto, note, editor_id):
 
     try:
         if edit_dto.get('change', None):
@@ -65,7 +65,7 @@ def process_edit(edit_dto, note):
     except:
         return None
 
-    edit = Edit(editor_id=edit_dto['editor_id'], note_id=note.id, edit_timestamp=datetime.today())
+    edit = Edit(editor_id=editor_id, note_id=note.id, edit_timestamp=datetime.today())
 
     session.add(edit)
     session.commit()
