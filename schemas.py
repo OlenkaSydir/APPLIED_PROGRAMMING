@@ -1,5 +1,6 @@
 from models import User, Note, ForeignEditor
 from marshmallow import Schema, fields
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
 
 
 class UserSchema(Schema):
