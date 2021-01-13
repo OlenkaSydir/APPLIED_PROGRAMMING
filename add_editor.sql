@@ -1,0 +1,1 @@
+insert into foreign_editors values(1, 1, 1)
