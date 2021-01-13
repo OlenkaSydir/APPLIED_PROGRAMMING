@@ -1,0 +1,1 @@
+insert into tags values(1, 'hello');
